@@ -1,0 +1,94 @@
+spring:
+  application:
+    name: erp-modular
+
+  threads:
+    virtual:
+      enabled: true   # Java 21: listeners @Async e requisições em virtual threads
+
+  # ---- DataSource único do monolito (infrastructure.datasource.DataSourceConfig) ----
+  datasource:
+    url: jdbc:h2:mem:erpdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+    hikari:
+      pool-name: erp-pool
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc.time_zone: UTC
+        # cria os schemas de cada módulo (clientes, estoque, compras, vendas, plataforma)
+        hbm2ddl.create_namespaces: true
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  # ---- JMS: filas para onde o outbox envia os eventos externalizados ----
+  artemis:
+    mode: embedded
+    embedded:
+      enabled: true
+      persistent: false
+      queues: erp.vendas.confirmadas,erp.compras.recebidas
+
+app:
+  outbox:
+    intervalo-ms: 2000   # frequência do relay outbox -> JMS
+    lote: 100            # mensagens por execução
+
+  # ---- Usuários (apenas desenvolvimento) ----
+  security:
+    usuarios:
+      - username: admin
+        senha: "{noop}admin123"
+        perfis: [ADMIN]
+      - username: estoque
+        senha: "{noop}estoque123"
+        perfis: [ESTOQUE]
+      - username: vendas
+        senha: "{noop}vendas123"
+        perfis: [VENDAS]
+      - username: compras
+        senha: "{noop}compras123"
+        perfis: [COMPRAS]
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    com.empresa.erp: DEBUG
+
+---
+# Perfil PostgreSQL:  mvn spring-boot:run -Dspring-boot.run.profiles=postgres
+# Em produção substitua o ddl-auto por migrations Flyway por módulo (db/migration/<modulo>).
+spring:
+  config:
+    activate:
+      on-profile: postgres
+  datasource:
+    url: jdbc:postgresql://localhost:5432/erp
+    username: erp
+    password: erp
+    driver-class-name: org.postgresql.Driver
+  h2:
+    console:
+      enabled: false
